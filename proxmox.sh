@@ -5,6 +5,7 @@ REQUIRED_VERSION="24.04"
 REQUIRED_CODENAME="lunar"
 DOCKER_GPG_URL="https://download.docker.com/linux/ubuntu/gpg"
 DOCKER_REPO="deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+OH_MY_ZSH_INSTALLER="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
 
 # Functions
 print_status() {
@@ -36,7 +37,7 @@ check_ubuntu_version() {
 install_prerequisites() {
     print_info "Installing system prerequisites..."
     apt update && apt -y upgrade
-    apt -y install net-tools qemu-guest-agent
+    apt -y install net-tools qemu-guest-agent zsh curl git fonts-powerline
     systemctl enable qemu-guest-agent
     systemctl start qemu-guest-agent
     print_status "System prerequisites installed and QEMU Guest Agent configured"
@@ -104,6 +105,25 @@ install_tailscale() {
     print_status "Tailscale authenticated and configured"
 }
 
+install_oh_my_zsh() {
+    print_info "Installing Oh My Zsh and configuring Powerline..."
+    
+    # Install Oh My Zsh non-interactively
+    RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL $OH_MY_ZSH_INSTALLER)"
+    print_status "Oh My Zsh installed"
+
+    # Set Zsh as default shell for root
+    chsh -s $(which zsh) root
+
+    # Install Powerline fonts (already installed via prerequisites)
+    print_status "Powerline fonts are ready"
+
+    # Add Powerline configuration to .zshrc
+    echo 'export TERM="xterm-256color"' >> ~/.zshrc
+    echo 'POWERLEVEL9K_MODE="nerdfont-complete"' >> ~/.zshrc
+    print_status ".zshrc updated for Powerline"
+}
+
 # Main script execution
 if [[ $EUID -ne 0 ]]; then
     echo -e "\e[31mThis script must be run as root.\e[0m"
@@ -114,5 +134,6 @@ check_ubuntu_version
 install_prerequisites
 install_docker
 install_tailscale "$1"
+install_oh_my_zsh
 
 echo -e "\e[32mAll tasks completed successfully!\e[0m"
