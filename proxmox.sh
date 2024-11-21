@@ -4,6 +4,7 @@
 DOCKER_GPG_URL="https://download.docker.com/linux/ubuntu/gpg"
 DOCKER_REPO="deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 OH_MY_ZSH_INSTALLER="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+USERNAME="yalefox"
 
 # Functions
 print_status() {
@@ -17,6 +18,25 @@ print_status() {
 
 print_info() {
     echo -e "\e[34m$1\e[0m"
+}
+
+add_user_to_groups() {
+    print_info "Adding user $USERNAME to groups..."
+
+    if id "$USERNAME" &>/dev/null; then
+        usermod -aG docker "$USERNAME"
+        print_status "User $USERNAME added to 'docker' group"
+
+        if ! id -nG "$USERNAME" | grep -qw "root"; then
+            usermod -aG root "$USERNAME"
+            print_status "User $USERNAME added to 'root' group"
+        else
+            print_status "User $USERNAME is already in 'root' group"
+        fi
+    else
+        echo -e "\e[31mUser $USERNAME does not exist. Please create the user first.\e[0m"
+        exit 1
+    fi
 }
 
 install_prerequisites() {
@@ -124,6 +144,7 @@ fi
 
 install_prerequisites
 install_docker
+add_user_to_groups
 install_tailscale "$1"
 install_oh_my_zsh
 
