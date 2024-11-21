@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Variables
-SUPPORTED_CODENAMES=("noble" "lunar")  # Add known valid codenames for Ubuntu 24.04
 DOCKER_GPG_URL="https://download.docker.com/linux/ubuntu/gpg"
 DOCKER_REPO="deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 OH_MY_ZSH_INSTALLER="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
@@ -18,19 +17,6 @@ print_status() {
 
 print_info() {
     echo -e "\e[34m$1\e[0m"
-}
-
-check_ubuntu_version() {
-    print_info "Checking Ubuntu version..."
-    VERSION=$(lsb_release -r -s || echo "unknown")
-    CODENAME=$(lsb_release -c -s || echo "unknown")
-
-    if [[ "$VERSION" == "24.04" && " ${SUPPORTED_CODENAMES[*]} " =~ " $CODENAME " ]]; then
-        print_status "Ubuntu 24.04 LTS ($CODENAME) detected"
-    else
-        echo -e "\e[31mThis script requires Ubuntu 24.04 LTS. Detected version: $VERSION ($CODENAME)\e[0m"
-        exit 1
-    fi
 }
 
 install_prerequisites() {
@@ -133,7 +119,6 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-check_ubuntu_version
 install_prerequisites
 install_docker
 install_tailscale "$1"
