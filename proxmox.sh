@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Variables
-REQUIRED_VERSION="24.04"
-REQUIRED_CODENAME="lunar"
+SUPPORTED_CODENAMES=("noble" "lunar")  # Add known valid codenames for Ubuntu 24.04
 DOCKER_GPG_URL="https://download.docker.com/linux/ubuntu/gpg"
 DOCKER_REPO="deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 OH_MY_ZSH_INSTALLER="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
@@ -23,13 +22,13 @@ print_info() {
 
 check_ubuntu_version() {
     print_info "Checking Ubuntu version..."
-    VERSION=$(lsb_release -r -s)
-    CODENAME=$(lsb_release -c -s)
+    VERSION=$(lsb_release -r -s || echo "unknown")
+    CODENAME=$(lsb_release -c -s || echo "unknown")
 
-    if [[ "$VERSION" == "$REQUIRED_VERSION" && "$CODENAME" == "$REQUIRED_CODENAME" ]]; then
-        print_status "Ubuntu $REQUIRED_VERSION LTS detected"
+    if [[ "$VERSION" == "24.04" && " ${SUPPORTED_CODENAMES[*]} " =~ " $CODENAME " ]]; then
+        print_status "Ubuntu 24.04 LTS ($CODENAME) detected"
     else
-        echo -e "\e[31mThis script requires Ubuntu $REQUIRED_VERSION LTS.\e[0m"
+        echo -e "\e[31mThis script requires Ubuntu 24.04 LTS. Detected version: $VERSION ($CODENAME)\e[0m"
         exit 1
     fi
 }
@@ -49,7 +48,7 @@ install_docker() {
     # Remove conflicting packages
     echo "Removing any conflicting Docker packages..."
     for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do 
-        apt-get remove -y $pkg 
+        apt-get remove -y $pkg >/dev/null 2>&1
     done
     print_status "Conflicting packages removed"
 
@@ -67,7 +66,7 @@ install_docker() {
 
     # Set up Docker repository
     echo "Setting up Docker repository..."
-    echo "$DOCKER_REPO" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    echo "$DOCKER_REPO" | tee /etc/apt/sources.list.d/docker.list >/dev/null
     apt-get update
     print_status "Docker repository setup"
 
@@ -109,8 +108,12 @@ install_oh_my_zsh() {
     print_info "Installing Oh My Zsh and configuring Powerline..."
     
     # Install Oh My Zsh non-interactively
-    RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL $OH_MY_ZSH_INSTALLER)"
-    print_status "Oh My Zsh installed"
+    if [ ! -d "$HOME/.oh-my-zsh" ]; then
+        RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL $OH_MY_ZSH_INSTALLER)"
+        print_status "Oh My Zsh installed"
+    else
+        print_status "Oh My Zsh is already installed"
+    fi
 
     # Set Zsh as default shell for root
     chsh -s $(which zsh) root
@@ -119,8 +122,8 @@ install_oh_my_zsh() {
     print_status "Powerline fonts are ready"
 
     # Add Powerline configuration to .zshrc
-    echo 'export TERM="xterm-256color"' >> ~/.zshrc
-    echo 'POWERLEVEL9K_MODE="nerdfont-complete"' >> ~/.zshrc
+    grep -qxF 'export TERM="xterm-256color"' ~/.zshrc || echo 'export TERM="xterm-256color"' >> ~/.zshrc
+    grep -qxF 'POWERLEVEL9K_MODE="nerdfont-complete"' ~/.zshrc || echo 'POWERLEVEL9K_MODE="nerdfont-complete"' >> ~/.zshrc
     print_status ".zshrc updated for Powerline"
 }
 
