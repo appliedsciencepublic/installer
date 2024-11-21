@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Version: 2.2
+# Version: 3.0
 
 # Load Environment Variables
 if [ -f .env.proxmox ]; then
@@ -46,8 +46,12 @@ if [[ "$VALIDATE_TOKEN" -ne 200 ]]; then
 fi
 success_message "Proxmox API token validated successfully."
 
-# Prompt user for new hostname
-read -p "Enter the new hostname (alphanumeric, hyphens, periods allowed): " NEW_HOSTNAME
+# Check for hostname argument or prompt user
+if [[ -z "$1" ]]; then
+    read -p "Enter the new hostname (alphanumeric, hyphens, periods allowed): " NEW_HOSTNAME
+else
+    NEW_HOSTNAME="$1"
+fi
 
 # Validate hostname (allow alphanumeric, periods, and hyphens)
 if ! [[ "$NEW_HOSTNAME" =~ ^[a-zA-Z0-9.-]+$ ]]; then
@@ -73,22 +77,28 @@ echo "$NEW_HOSTNAME" | sudo tee /etc/hostname > /dev/null
 # Step 3: Update /etc/hosts file
 sudo sed -i "s/$CURRENT_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
 
-# Step 4: Release and renew IP address
-log_message "Releasing IP address..."
+# Step 4: Check and Install isc-dhcp-client if missing
+log_message "Checking for DHCP client (isc-dhcp-client)..."
 if ! command -v dhclient &> /dev/null; then
-    error_message "Error: dhclient not found. Please install it using 'sudo apt install isc-dhcp-client'."
-    exit 1
+    log_message "isc-dhcp-client not found. Installing..."
+    sudo apt update && sudo apt install -y isc-dhcp-client || { error_message "Failed to install isc-dhcp-client."; exit 1; }
+    success_message "isc-dhcp-client installed successfully."
+else
+    success_message "isc-dhcp-client is already installed."
 fi
+
+# Step 5: Release and renew IP address
+log_message "Releasing IP address..."
 sudo dhclient -r || { error_message "Failed to release IP address."; exit 1; }
 log_message "Renewing IP address..."
 sudo dhclient -v || { error_message "Failed to renew IP address."; exit 1; }
 
-# Step 5: Display old and new IP addresses
+# Step 6: Display old and new IP addresses
 IP_AFTER=$(hostname -I | awk '{print $1}')
 success_message "Old IP Address: $IP_BEFORE"
 success_message "New IP Address: $IP_AFTER"
 
-# Step 6: Update the Proxmox VM name using the API
+# Step 7: Update the Proxmox VM name using the API
 log_message "Updating Proxmox VM name in the Proxmox UI..."
 RESPONSE=$(curl -k -s -X PUT "$PROXMOX_API_URL/nodes/$NODE_NAME/qemu/$VMID/config" \
     -H "Authorization: PVEAPIToken=$PROXMOX_API_TOKEN_ID=$PROXMOX_API_TOKEN_SECRET" \
@@ -104,7 +114,7 @@ else
     success_message "Proxmox VM name successfully updated to $NEW_HOSTNAME."
 fi
 
-# Step 7: Set Welcome Message (Message of the Day)
+# Step 8: Set Welcome Message (Message of the Day)
 log_message "Setting custom welcome message for $NEW_HOSTNAME..."
 WELCOME_MESSAGE="Welcome to $NEW_HOSTNAME\n\n\
 IP Address: $IP_AFTER\n\
