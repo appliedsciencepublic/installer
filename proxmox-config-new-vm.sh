@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Version: 3.0
+# Version: 3.1
 
 # Load Environment Variables
 if [ -f .env.proxmox ]; then
@@ -46,12 +46,8 @@ if [[ "$VALIDATE_TOKEN" -ne 200 ]]; then
 fi
 success_message "Proxmox API token validated successfully."
 
-# Check for hostname argument or prompt user
-if [[ -z "$1" ]]; then
-    read -p "Enter the new hostname (alphanumeric, hyphens, periods allowed): " NEW_HOSTNAME
-else
-    NEW_HOSTNAME="$1"
-fi
+# Prompt user for new hostname
+read -p "Enter the new hostname (alphanumeric, hyphens, periods allowed): " NEW_HOSTNAME
 
 # Validate hostname (allow alphanumeric, periods, and hyphens)
 if ! [[ "$NEW_HOSTNAME" =~ ^[a-zA-Z0-9.-]+$ ]]; then
