@@ -1,11 +1,17 @@
 #!/bin/bash
 
-# Version: 2.0
+# Version: 2.1
+
+# Load Environment Variables
+if [ -f .env.proxmox ]; then
+    source .env.proxmox
+else
+    echo "Error: .env.proxmox file not found. Please create it with PROXMOX_API_TOKEN_ID and PROXMOX_API_TOKEN_SECRET."
+    exit 1
+fi
 
 # Variables
 PROXMOX_API_URL="https://172.16.1.5:8006/api2/json"
-API_TOKEN_ID="deployments-newvms@pam!deployments-newvms-token" # Account is no good
-API_TOKEN_SECRET="c8ef1757-d1ba-4d26-8d90-97d9b765abc3" # Key is no good
 VMID="500"
 NODE_NAME="gpu1"  # Confirm that this is the correct node name
 CURRENT_HOSTNAME=$(hostname)
@@ -18,7 +24,7 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Logging Function
+# Logging Functions
 log_message() {
     echo -e "${CYAN}[$(date +%Y-%m-%dT%H:%M:%S)] ${YELLOW}$1${NC}"
 }
@@ -31,44 +37,61 @@ error_message() {
     echo -e "${RED}[$(date +%Y-%m-%dT%H:%M:%S)] $1${NC}"
 }
 
-# Step 1: Prompt user for the new hostname
+# Validate Proxmox API Token
+log_message "Validating Proxmox API token..."
+VALIDATE_TOKEN=$(curl -k -s -o /dev/null -w "%{http_code}" -H "Authorization: PVEAPIToken=$PROXMOX_API_TOKEN_ID=$PROXMOX_API_TOKEN_SECRET" "$PROXMOX_API_URL/version")
+if [[ "$VALIDATE_TOKEN" -ne 200 ]]; then
+    error_message "Proxmox API token validation failed. Please check your .env.proxmox file."
+    exit 1
+fi
+success_message "Proxmox API token validated successfully."
+
+# Prompt user for new hostname
 read -p "Enter the new hostname (avoid periods): " NEW_HOSTNAME
 
-# Check for period in hostname
-if [[ "$NEW_HOSTNAME" == *"."* ]]; then
-    error_message "Error: Hostname should not contain periods."
+# Validate hostname
+if [[ "$NEW_HOSTNAME" == *"."* ]] || ! [[ "$NEW_HOSTNAME" =~ ^[a-zA-Z0-9-]+$ ]]; then
+    error_message "Error: Hostname must not contain periods and must use only alphanumeric characters and hyphens."
     exit 1
 fi
 
-# Step 2: Update the hostname temporarily (for the current session)
-log_message "Changing hostname from ${RED}$CURRENT_HOSTNAME${YELLOW} to ${GREEN}$NEW_HOSTNAME${NC}..."
-sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+# Confirmation prompt
+log_message "You are about to change the hostname from ${RED}$CURRENT_HOSTNAME${YELLOW} to ${GREEN}$NEW_HOSTNAME${NC}."
+read -p "Are you sure you want to proceed? [y/N]: " CONFIRM
+if [[ "$CONFIRM" != "y" ]]; then
+    error_message "Operation canceled by user."
+    exit 0
+fi
 
-# Step 3: Update /etc/hostname file
+# Step 1: Update the hostname temporarily (for the current session)
+log_message "Changing hostname to $NEW_HOSTNAME..."
+sudo hostnamectl set-hostname "$NEW_HOSTNAME" || { error_message "Failed to update hostname."; exit 1; }
+
+# Step 2: Update /etc/hostname file
 echo "$NEW_HOSTNAME" | sudo tee /etc/hostname > /dev/null
 
-# Step 4: Update /etc/hosts file
+# Step 3: Update /etc/hosts file
 sudo sed -i "s/$CURRENT_HOSTNAME/$NEW_HOSTNAME/g" /etc/hosts
 
-# Step 5: Release and renew IP address
+# Step 4: Release and renew IP address
 log_message "Releasing IP address..."
 if ! command -v dhclient &> /dev/null; then
     error_message "Error: dhclient not found. Please install it using 'sudo apt install isc-dhcp-client'."
     exit 1
 fi
-sudo dhclient -r
+sudo dhclient -r || { error_message "Failed to release IP address."; exit 1; }
 log_message "Renewing IP address..."
-sudo dhclient -v
+sudo dhclient -v || { error_message "Failed to renew IP address."; exit 1; }
 
-# Step 6: Display old and new IP addresses
+# Step 5: Display old and new IP addresses
 IP_AFTER=$(hostname -I | awk '{print $1}')
 success_message "Old IP Address: $IP_BEFORE"
 success_message "New IP Address: $IP_AFTER"
 
-# Step 7: Update the Proxmox VM name using the API
+# Step 6: Update the Proxmox VM name using the API
 log_message "Updating Proxmox VM name in the Proxmox UI..."
 RESPONSE=$(curl -k -s -X PUT "$PROXMOX_API_URL/nodes/$NODE_NAME/qemu/$VMID/config" \
-    -H "Authorization: PVEAPIToken=$API_TOKEN_ID=$API_TOKEN_SECRET" \
+    -H "Authorization: PVEAPIToken=$PROXMOX_API_TOKEN_ID=$PROXMOX_API_TOKEN_SECRET" \
     -d "name=$NEW_HOSTNAME")
 
 # Log the full response from Proxmox for debugging
@@ -81,7 +104,7 @@ else
     success_message "Proxmox VM name successfully updated to $NEW_HOSTNAME."
 fi
 
-# Step 8: Set Welcome Message (Message of the Day)
+# Step 7: Set Welcome Message (Message of the Day)
 log_message "Setting custom welcome message for $NEW_HOSTNAME..."
 WELCOME_MESSAGE="Welcome to $NEW_HOSTNAME\n\n\
 IP Address: $IP_AFTER\n\
