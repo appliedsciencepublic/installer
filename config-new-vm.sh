@@ -4,8 +4,8 @@
 
 # Variables
 PROXMOX_API_URL="https://172.16.1.5:8006/api2/json"
-API_TOKEN_ID="deployments-newvms@pam!deployments-newvms-token"
-API_TOKEN_SECRET="c8ef1757-d1ba-4d26-8d90-97d9b765abc3"
+API_TOKEN_ID="deployments-newvms@pam!deployments-newvms-token" # Account is no good
+API_TOKEN_SECRET="c8ef1757-d1ba-4d26-8d90-97d9b765abc3" # Key is no good
 VMID="500"
 NODE_NAME="gpu1"  # Confirm that this is the correct node name
 CURRENT_HOSTNAME=$(hostname)
