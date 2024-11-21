@@ -86,7 +86,10 @@ install_tailscale() {
     print_status "Tailscale installed"
 
     echo "Authenticating Tailscale..."
-    tailscale up --authkey="$AUTH_KEY"
+    if ! tailscale up --authkey="$AUTH_KEY"; then
+        echo -e "\e[31mError: Tailscale authentication failed. Please verify your auth key.\e[0m"
+        exit 1
+    fi
     print_status "Tailscale authenticated and configured"
 }
 
