@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Version: 2.1
+# Version: 2.2
 
 # Load Environment Variables
 if [ -f .env.proxmox ]; then
@@ -47,11 +47,11 @@ fi
 success_message "Proxmox API token validated successfully."
 
 # Prompt user for new hostname
-read -p "Enter the new hostname (avoid periods): " NEW_HOSTNAME
+read -p "Enter the new hostname (alphanumeric, hyphens, periods allowed): " NEW_HOSTNAME
 
-# Validate hostname
-if [[ "$NEW_HOSTNAME" == *"."* ]] || ! [[ "$NEW_HOSTNAME" =~ ^[a-zA-Z0-9-]+$ ]]; then
-    error_message "Error: Hostname must not contain periods and must use only alphanumeric characters and hyphens."
+# Validate hostname (allow alphanumeric, periods, and hyphens)
+if ! [[ "$NEW_HOSTNAME" =~ ^[a-zA-Z0-9.-]+$ ]]; then
+    error_message "Error: Hostname must use only alphanumeric characters, hyphens, and periods."
     exit 1
 fi
 
